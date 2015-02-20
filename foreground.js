@@ -40,39 +40,49 @@ var bg = chrome.extension.getBackgroundPage();
 //     weight : 1
 // });
 
-bg.counter++;
+// bg.counter++;
 
-
-
-
-var w = 500, h = 500;
+var graphContainerW = 500, graphContainerH = 500;
 
 var labelDistance = 0;
 
-var vis = d3.select("body").append("svg:svg").attr("width", w).attr("height", h);
 
-var force = d3.layout.force().size([w, h]).nodes(bg.nodes).links(bg.links).gravity(1).linkDistance(50).charge(-3000).linkStrength(function(x) {
-    return x.weight * 10
+
+var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", function () {
+    graph.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
 });
 
 
+var graphContainer = d3.select("#graph_container").append("svg:svg").attr("width", graphContainerW).attr("height", graphContainerH).call(zoomListener);;
+
+var graph = graphContainer.append("g");
+
+
+
+
+
+
+var force = d3.layout.force().size([graphContainerW, graphContainerH]).nodes(bg.nodes).links(bg.links).gravity(1).linkDistance(50).charge(-3000).linkStrength(function(x) {
+    return x.weight * 10
+});
+
 force.start();
 
-var force2 = d3.layout.force().nodes(bg.labelAnchors).links(bg.labelAnchorLinks).gravity(0).linkDistance(0).linkStrength(8).charge(-100).size([w, h]);
+var force2 = d3.layout.force().nodes(bg.labelAnchors).links(bg.labelAnchorLinks).gravity(0).linkDistance(50).linkStrength(8).charge(-100).size([graphContainerW, graphContainerH]);
 force2.start();
 
-var link = vis.selectAll("line.link").data(bg.links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
-
-var node = vis.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
-node.append("svg:circle").attr("r", 5).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);
-node.call(force.drag);
 
 
-var anchorLink = vis.selectAll("line.anchorLink").data(bg.labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+var link = graph.selectAll("line.link").data(bg.links).enter().append("svg:line").attr("class", "link").style("stroke", "#CCC");
 
-var anchorNode = vis.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
+var node = graph.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
+node.append("svg:circle").attr("r", 16).style("fill", "#555").style("stroke", "#FFF").style("stroke-width", 3);
+
+var anchorLink = graph.selectAll("line.anchorLink").data(bg.labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+
+var anchorNode = graph.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
 anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
-    anchorNode.append("svg:text").text(function(d, i) {
+anchorNode.append("svg:text").text(function(d, i) {
     return i % 2 == 0 ? "" : d.node.label
 }).style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
 

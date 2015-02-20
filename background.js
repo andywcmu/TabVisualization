@@ -12,49 +12,74 @@ var links = [];
 /* tabID: nodeIndex */
 activeTab = {};
 
-current = {'tabId': -1, 'windowId': -1, 'title': ''};
+current = {'tabId': -1, 'windowId': -1, 'url': null};
+
+function urlHash (url) {
+    return url;
+}
 
 chrome.webNavigation.onCommitted.addListener(function (detail) {
-    // console.log(detail);
-    if (detail.transitionType != 'auto_subframe') {
-        if (detail.transitionType == 'link') {
 
-            /* add a node and path if necessary */
-            if (detail.url in sites) {
-                /* increase weight? */
-            } else {
-                var node = {
-                    label : detail.url
-                };
-                nodes.push(node);
-                labelAnchors.push({
-                    node : node
-                });
-                labelAnchors.push({
-                    node : node
-                });
-                labelAnchorLinks.push({
-                    source : (nodes.length - 1) * 2,
-                    target : (nodes.length - 1) * 2 + 1,
+    // console.log(detail.transitionType);
+
+    if (detail.transitionType != "auto_subframe") {
+        newUrl = urlHash(detail.url);
+
+
+        if (newUrl in sites) {
+            /* increase weight? */
+        } else {
+            var node = {
+                label : newUrl
+            };
+            nodes.push(node);
+            labelAnchors.push({
+                node : node
+            });
+            labelAnchors.push({
+                node : node
+            });
+            labelAnchorLinks.push({
+                source : (nodes.length - 1) * 2,
+                target : (nodes.length - 1) * 2 + 1,
+                weight : 1
+            });
+            
+            sites[newUrl] = {title : newUrl,
+                             index : nodes.length - 1};
+        }
+
+        if (detail.transitionType != 'auto_subframe') {
+            if (detail.transitionType == 'link') {
+                
+                
+
+                console.log("link from " + current.url + " to " + newUrl);
+                console.log("id " + sites[current.url].index + " -> " + sites[newUrl].index);
+
+                links.push({
+                    source : sites[current.url].index,
+                    target : sites[newUrl].index,
                     weight : 1
                 });
-                
-                sites[detail.url] = {title : detail.url,
-                                     index : nodes.length - 1};
+
+                // newTabId = detail.tabId;
+                // console.log('LINK from tab ' + current.tabId + ' to ' + newTabId);
+
             }
-
-            // newTabId = detail.tabId;
-            // console.log('LINK from tab ' + current.tabId + ' to ' + newTabId);
-
         }
-    } 
+
+        current.url = newUrl;
+    }
+    
 });
 
 chrome.webNavigation.onDOMContentLoaded.addListener(function (detail) {
     chrome.tabs.get(detail.tabId, function (tab) {
         /* update title of a tab */
-        if (tab.url in sites) {
-            nodes[sites[tab.url].index].label = tab.title;
+        url = urlHash(tab.url);
+        if (url in sites) {
+            nodes[sites[url].index].label = tab.title;
         }
     });
 });
@@ -70,12 +95,11 @@ chrome.webNavigation.onDOMContentLoaded.addListener(function (detail) {
 // });
 
 chrome.tabs.onActivated.addListener(function (info) {
-    
-    console.log(info);
     current.tabId = info.tabId;
     current.windowId = info.windowId;
-    // current.title = info
-    // console.log(current);
+    chrome.tabs.get(info.tabId, function (tab) {
+        current.url = urlHash(tab.url);
+    });
 });
 
 chrome.windows.onFocusChanged.addListener(function (id) {
@@ -87,6 +111,10 @@ chrome.windows.onFocusChanged.addListener(function (id) {
     chrome.tabs.query(queryInfo, function(tabs) {
         current.tabId = tabs[0].id;
         current.windowId = tabs[0].windowId;
-        // console.log(current);
+        chrome.tabs.get(tabs[0].id, function (tab) {
+            current.url = urlHash(tab.url);
+        });
     });
+
+    
 });
