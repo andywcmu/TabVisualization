@@ -85,7 +85,6 @@ function createLink (parentUrl, childUrl) {
     childUrl = urlHash(childUrl);
 
     if ((parentUrl in sites) && (childUrl in sites)) {
-        console.log(sites[parentUrl].index + " " + sites[childUrl].index);
         links.push({
             source : sites[parentUrl].index,
             target : sites[childUrl].index,

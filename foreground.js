@@ -1,51 +1,96 @@
+/* get information from background.js */
 var bg = chrome.extension.getBackgroundPage();
 
-// var node = {
-//     label : "node " + bg.counter
-// };
-// bg.nodes.push(node);
-// bg.labelAnchors.push({
-//     node : node
-// });
-// bg.labelAnchors.push({
-//     node : node
-// });
+/************************************/
+/*** CONTRACT GRAPH (SIMPLIFY IT) ***/
+/************************************/
 
-// if (bg.counter > 0) {
-//     bg.links.push({
-//         source : bg.counter - 1,
-//         target : bg.counter,
-//         weight : Math.random()
-//     });
-// }
-//     bg.labelAnchorLinks.push({
-//         source : bg.counter * 2,
-//         target : bg.counter * 2 + 1,
-//         weight : 1
-//     });
-// }
+/* We decide to contract the graph at the time the extension is clicked,
+ * instead of doing it in the background everytime a new webpage is opened.
+ * This may not be a good idea since doing heavy computation on foreground
+ * causing the visualization taking a long time to be shown makes users think
+ * it's our fault. On the other hand, doing heavy computation on background
+ * makes users think it's Chrome's fault. Lol.
+ * But we're honest human beings.
+ */
 
-// for(var j = 0; j < bg.counter; j++) {
-//     // if(Math.random() > .95)
-//         bg.links.push({
-//             source : bg.counter,
-//             target : j,
-//             weight : Math.random()
-//         });
-// }
+/* Graph used by foreground. Need to be lists to conform with D3 standards. */
+var nodes = [];
+var labelAnchors = [];
+var labelAnchorLinks = [];
+var links = [];
 
-// bg.labelAnchorLinks.push({
-//     source : bg.counter * 2,
-//     target : bg.counter * 2 + 1,
-//     weight : 1
-// });
+/* DFS using recursion. This assumes that the graph from background has
+ * no cycle or we're fucked (and yes we constructed the background graph to
+ * have no cycle. see background.js).
+ */
 
-// bg.counter++;
+/* TODO: use iterative method instead (queue) since
+ * there may be tons of webpages opened.
+ */
+
+var CHAIN_THRESHOLD = 1
+
+function createNode (node) {
+    nodes.push(node);
+    nodeId = nodes.length - 1;
+
+    /** Add label **/
+
+    /* create anchor nodes */
+    for (var i = 0; i < 2; i++) {
+        labelAnchors.push({
+            node : node
+        });
+    }
+
+    /* link the anchor nodes */
+    labelAnchorLinks.push({
+        source : nodeId * 2,
+        target : nodeId * 2 + 1,
+        weight : 1
+    });
+
+    return nodeId;
+}
+
+function DFSContractGraph (chainThreshold) {
+    function contractChain (node, isRoot) {
+        if (node.children.length == 1) {
+            [contentNodes, endNodeId] = contractChain(node.children[0], false);
+            contentNodes.push(node);
+            return [contentNodes, endNodeId];
+        } else {
+            /* This node should not be contracted into a super link */
+            var nodeId = createNode(node);
+
+            for (child in node.children) {
+                [contentNodes, endNodeId] = contractChain(child, false);
+                
+                links.push({
+                    source : nodeId,
+                    target : endNodeId,
+                    content : contentNodes,
+                    weight : 1
+                });
+            }
+            
+            return [[], nodeId];
+        }
+    }
+
+    for (root in bg.roots) {
+        contractChain(root, true);
+    }
+}
+
+// DFSContractGraph();
+
+/********************/
+/*** CREATE GRAPH ***/
+/********************/
 
 var graphContainerW = 800, graphContainerH = 600;
-
-// var labelDistance = 0;
-
 
 
 var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", function () {
@@ -56,9 +101,6 @@ var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", function 
 var graphContainer = d3.select("#graph_container").append("svg:svg").attr("width", graphContainerW).attr("height", graphContainerH).call(zoomListener);;
 
 var graph = graphContainer.append("g");
-
-
-
 
 
 
@@ -91,85 +133,14 @@ function urlHash (url) {
     return url.match(/^[^\#]+/)[0];
 }
 
-function centerNode(n) {
-    scale = zoomListener.scale();
-    x = -n.x;
-    y = -n.y;
-    x = x * scale + graphContainerW / 2;
-    y = y * scale + graphContainerH / 2;
-    d3.select('g').transition()
-        // .duration(duration)
-        .attr("transform", "translate(" + x + "," + y + ")scale(" + scale + ")");
-    zoomListener.scale(scale);
-    zoomListener.translate([x, y]);
-}
-
-node.on("click", function(d, i){
-    chrome.tabs.create({url: bg.nodes[i].url});
-    // centerNode(d);
-    /* Should check if the url already exists in one of the tabs first
-     * if yes, switch to that tab. otherwise open a new tab with that url.
-     * Work on this later!
-     */
-    // chrome.tabs.query({}, function (tabs){
-    //     for (var j = 0; j < tabs.length; j++) {
-    //         chrome.tabs.get(tabs[j].id, function (tab) {
-    //             console.log(urlHash(bg.nodes[i].url));
-    //             if ("https://instagram.com" == urlHash(bg.nodes[i].url)) {
-    //                 chrome.tabs.highlight(tab.id);
-    //                 console.log("HIGHLIGHT "+tab.id);
-    //             }
-    //         });
-    //     }
-    // });
-});
-
-// var currentNode = graph.selectAll("g.node")[bg.current.nodeId];
-// centerNode(currentNode);
 
 
-
-
-// var updateLink = function() {
-//     this.attr("x1", function(d) {
-//         return d.source.x;
-//     }).attr("y1", function(d) {
-//         return d.source.y;
-//     }).attr("x2", function(d) {
-//         return d.target.x;
-//     }).attr("y2", function(d) {
-//         return d.target.y;
-//     });
-
-// }
-
-var updateLink = function() {
-    this.attr("x1", function(d) {
-        // return d.source.x - currentNodeX + (graphContainerW / 2);
-        return getRelatedTranslateX(d.source.x);
-    }).attr("y1", function(d) {
-        return getRelatedTranslateY(d.source.y);
-        // return d.source.y - currentNodeY + (graphContainerH / 2);
-    }).attr("x2", function(d) {
-        return getRelatedTranslateX(d.target.x);
-        // return d.target.x - currentNodeX + (graphContainerW / 2);
-    }).attr("y2", function(d) {
-        return getRelatedTranslateY(d.target.y);
-        // return d.target.y - currentNodeY + (graphContainerH / 2);
-    });
-}
-
-
+/******************************************/
+/*** NODE & LINK POSITION RELATED STUFF ***/
+/******************************************/
 
 var currentNodeX = graphContainerW / 2;
 var currentNodeY = graphContainerH / 2;
-
-// function getRelatedTranslate (x, y) {
-//     relatedX = x - currentNodeX + (graphContainerW / 2);
-//     relatedY = y - currentNodeY + (graphContainerH / 2);
-    
-//     return "translate(" + relatedX + "," + relatedY + ")";
-// }
 
 function getRelatedTranslateX (x) {
     return x - currentNodeX + (graphContainerW / 2);
@@ -179,35 +150,36 @@ function getRelatedTranslateY (y) {
     return y - currentNodeY + (graphContainerH / 2);
 }
 
-var updateNode = function() {
-    this.attr("transform", function(d, i) {
-        return "translate(" + getRelatedTranslateX(d.x) + "," + getRelatedTranslateY(d.y) + ")";        
-
-
-        // return getRelatedTranslate(d.x, d.y);
-
-        // relatedX = d.x - currentNodeX + (graphContainerW / 2);
-        // relatedY = d.y - currentNodeY + (graphContainerH / 2);
-
-        // return "translate(" + d.x + "," + d.y + ")";
-        // return "translate(" + relatedX + "," + relatedY + ")";
-    });
-
-}
-
-
-force.on("tick", function() {
-
-    console.log("" + currentNodeX + "  " + currentNodeY);
-
-    force2.start();
-
+function updateCurrentNode () {
     node.each(function(d, i) {
         if (i == bg.current.nodeId) {
             currentNodeX = d.x;
             currentNodeY = d.y;
         }
     });
+}
+
+function updateNode () {
+    this.attr("transform", function(d, i) {
+        return "translate(" + getRelatedTranslateX(d.x) + "," + getRelatedTranslateY(d.y) + ")";        
+    });
+}
+
+function updateLink () {
+    this.attr("x1", function(d) {
+        return getRelatedTranslateX(d.source.x);
+    }).attr("y1", function(d) {
+        return getRelatedTranslateY(d.source.y);
+    }).attr("x2", function(d) {
+        return getRelatedTranslateX(d.target.x);
+    }).attr("y2", function(d) {
+        return getRelatedTranslateY(d.target.y);
+    });
+}
+
+force.on("tick", function() {
+
+    force2.start();
 
     node.call(updateNode);
 
@@ -227,8 +199,6 @@ force.on("tick", function() {
             shiftX = Math.max(-b.width, Math.min(0, shiftX));
             var shiftY = 5;
             this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
-            // this.childNodes[1].setAttribute("transform", getRelatedTranslate(shiftX, shiftY));
-
         }
     });
 
@@ -238,3 +208,11 @@ force.on("tick", function() {
     link.call(updateLink);
     anchorLink.call(updateLink);
 });
+
+
+
+
+
+
+updateCurrentNode();
+
