@@ -1,6 +1,7 @@
 /* TODO:
  * URGENT - Unable to track Shift + Ctrl + Click :(
  * Write README
+ * Move diameter to foreground.js
  */
 
 /************************/
@@ -39,7 +40,17 @@ function getVisitId (tabId) {
 /* roots: [root id's] */
 var roots = [];
 
-/* graph: {key : id, value : {label, url, size, children : [children id's]}} */
+/*
+    graph: a dictionary of {
+        key : visitId,
+        value : {
+            label : the node's label,
+            url : the node's url,
+            size : node's diameter in visualization,
+            children : [children id's]
+        }
+    }
+*/
 var graph = {};
 
 
