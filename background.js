@@ -1,9 +1,7 @@
 /* TODO:
  * URGENT - Unable to track Shift + Ctrl + Click :(
+ * Write README
  */
-
-
-GOOGLE_SEARCH_STR = "http://www.google.com/search?q=";
 
 /************************/
 /*** VISIT ID MANAGER ***/
@@ -36,12 +34,9 @@ function getVisitId (tabId) {
 /*** DICTIONARY REPRESENTATION OF GRAPH ***/
 /******************************************/
 
-/* The tree we construct will should follow the following invariants:
- * 1. a node may have any number of children
- * 2. a node may not have more than one parent
- * 2 implies that there's no cycle in the tree.
- */
+/** The graph we construct will be a directed tree. **/
 
+/* roots: [root id's] */
 var roots = [];
 
 /* graph: {key : id, value : {label, url, size, children : [children id's]}} */
@@ -53,26 +48,10 @@ var graph = {};
 /*** TAB TRACKER ***/
 /*******************/
 
-// var tabStatus = [];
-
 var currentTabId = -1;
-
-// function getTab (tabId) {
-//     ts = tabStatus.filter(function (t) {
-//         return t.id == tabId;
-//     });
-    
-//     if (ts.length == 0) {
-//         return null;
-//     } else {
-//         return ts[0];        
-//     }
-// }
 
 function updateCurrentTabId (tabId) {
     currentTabId = tabId;
-    // console.log(visitIds);
-    // console.log(graph);
 }
 
 /* These listeners are used to track the tab that the user is currently
@@ -173,16 +152,9 @@ chrome.webNavigation.onCommitted.addListener(function (detail) {
         // });
 
         if (isInLinkType(detail.transitionType, LINK_CHILD_TYPE)) {
-            // tabId = getTab(currentTabId);
-
-            // if (tabId == null) {
-            //     console.log("DEBUG: tab " + currentTabId + " cannot be found");
-            // } else {
-                parentVisitId = getVisitId(currentTabId);
-                createChildren(parentVisitId, visitId, detail.url);
-            // }
+            parentVisitId = getVisitId(currentTabId);
+            createChildren(parentVisitId, visitId, detail.url);
         } else {
-            // console.log("commited: " + detail.url);
             createRoot(visitId, detail.url);
         }   
     

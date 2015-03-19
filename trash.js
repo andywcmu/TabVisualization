@@ -83,6 +83,7 @@ node.on("click", function(d, i){
 
 
 
+GOOGLE_SEARCH_STR = "http://www.google.com/search?q=";
 
 
 chrome.omnibox.onInputEntered.addListener(function (info) {
@@ -108,5 +109,19 @@ function updateCurrentNodeID (tabId) {
         url = urlHash(tab.url);
         console.log(url);
         current.nodeId = (url in sites) ? sites[url].index : -1;
+    }
+}
+
+
+
+function getTab (tabId) {
+    ts = tabStatus.filter(function (t) {
+        return t.id == tabId;
+    });
+    
+    if (ts.length == 0) {
+        return null;
+    } else {
+        return ts[0];        
     }
 }
