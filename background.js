@@ -1,7 +1,7 @@
 /* TODO:
  * URGENT - Unable to track Shift + Ctrl + Click :(
+ * Change graph to a list
  * Write README
- * Move diameter to foreground.js
  */
 
 /************************/
@@ -96,14 +96,10 @@ chrome.windows.onFocusChanged.addListener(function (id) {
 /*** GRAPH BUILDER FUNCTIONS ***/
 /*******************************/
 
-DIA_ROOT_NODE = 30;
-DIA_CHILD_NODE = 16;
-
-function createNode (visitId, url, node_diameter) {
+function createNode (visitId, url) {
     graph[visitId] = {
         label : url,
         url : url,
-        size : node_diameter,
         children : []
     }
 }
@@ -113,12 +109,12 @@ function createLink (parentId, childId) {
 }
 
 function createChildren (parentId, childId, childUrl) {
-    createNode(childId, childUrl, DIA_CHILD_NODE);
+    createNode(childId, childUrl);
     createLink(parentId, childId);
 }
 
 function createRoot (rootId, rootUrl) { 
-    createNode(rootId, rootUrl, DIA_ROOT_NODE);
+    createNode(rootId, rootUrl);
     roots.push(rootId);
 }
 

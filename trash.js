@@ -1,6 +1,38 @@
 /* Codes that are no longer being used. Archive purpose only. */
 
 
+
+        // if (depth > 100) {
+        //     console.log("DEBUG: infinite loop");
+        //     return [[], -1];
+        // }
+
+        // if (node.children.length == 1) {
+        //     ret = expandGraph(node.children[0], depth + 1);
+        //     contentNodes = ret[0];
+        //     endNodeId = ret[1];
+        //     contentNodes.push(node);
+        //     return [contentNodes, endNodeId];
+        // } else {
+        //     /* This node should not be contracted into a super link */
+        //     var nodeId = createNode(node);
+
+        //     for (child in node.children) {
+        //         ret = expandGraph(child, depth + 1);
+        //         contentNodes = ret[0];
+        //         endNodeId = ret[1];
+
+        //         links.push({
+        //             source : nodeId,
+        //             target : endNodeId,
+        //             content : contentNodes,
+        //             weight : 1
+        //         });
+        //     }
+            
+        //     return [[], nodeId];
+        // }
+
 var node = {
     label : "node " + bg.counter
 };

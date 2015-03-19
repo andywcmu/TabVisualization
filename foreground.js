@@ -29,11 +29,21 @@ var links = [];
  * there may be tons of webpages opened.
  */
 
+var DIA_ROOT_NODE = 30;
+var DIA_CHILD_NODE = 16;
+
 var CHAIN_THRESHOLD = 1
 
-function createNode (node) {
+function createNode (bgNode, diameter) {
+    var node = {
+        label : bgNode.label,
+        url : bgNode.url,
+        diameter : diameter
+    }
+
     nodes.push(node);
-    nodeId = nodes.length - 1;
+
+    var nodeId = nodes.length - 1;
 
     /** Add label **/
 
@@ -54,59 +64,51 @@ function createNode (node) {
     return nodeId;
 }
 
-function DFSContractGraph (chainThreshold) {
-    function contractChain (node, depth) {
-        /* DEBUG PURPOSE */
-        if (depth > 100) {
-            console.log("DEBUG: infinite loop");
-            return [[], -1];
-        }
-
-        if (node.children.length == 1) {
-            ret = contractChain(node.children[0], depth + 1);
-            contentNodes = ret[0];
-            endNodeId = ret[1];
-            contentNodes.push(node);
-            return [contentNodes, endNodeId];
-        } else {
-            /* This node should not be contracted into a super link */
-            var nodeId = createNode(node);
-
-            for (child in node.children) {
-                ret = contractChain(child, depth + 1);
-                contentNodes = ret[0];
-                endNodeId = ret[1];
-
-                links.push({
-                    source : nodeId,
-                    target : endNodeId,
-                    content : contentNodes,
-                    weight : 1
-                });
-            }
-            
-            return [[], nodeId];
-        }
+function expandGraph (visitId, depth) {
+    /* DEBUG PURPOSE */
+    if (depth > 1000) {
+        console.log("DEBUG: infinite loop");
+        return [[], -1];
     }
 
-    for (root in bg.roots) {
-        contractChain(root, true);
+    var bgNode = bg.graph[visitId];
+    var fgNodeId = createNode(bgNode, depth == 0 ? DIA_ROOT_NODE : DIA_CHILD_NODE);
+    
+    for (var i = 0; i < bgNode.children.length; i++) {
+        var retval = expandGraph(bgNode.children[i], depth + 1);
+        var contentNodes = retval[0];
+        var endNodeId = retval[1];
+
+        links.push({
+            source : fgNodeId,
+            target : endNodeId,
+            content : contentNodes,
+            weight : 1
+        });
+    }
+
+    return [[], fgNodeId];
+}
+
+function buildContractedGraph (chainThreshold) {
+    for (rootId in bg.roots) {
+        expandGraph(rootId, 0);
     }
 }
 
-// DFSContractGraph();
+buildContractedGraph();
 
-/********************/
-/*** CREATE GRAPH ***/
-/********************/
+
+
+/***********************/
+/*** VISUALIZE GRAPH ***/
+/***********************/
 
 var graphContainerW = 800, graphContainerH = 600;
-
 
 var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", function () {
     graph.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
 });
-
 
 var graphContainer = d3.select("#graph_container").append("svg:svg").attr("width", graphContainerW).attr("height", graphContainerH).call(zoomListener);;
 
@@ -114,23 +116,23 @@ var graph = graphContainer.append("g");
 
 
 
-var force = d3.layout.force().size([graphContainerW, graphContainerH]).nodes(bg.nodes).links(bg.links).gravity(0.2).linkDistance(100).charge(-3000).linkStrength(function(x) {
+var force = d3.layout.force().size([graphContainerW, graphContainerH]).nodes(nodes).links(links).gravity(0.2).linkDistance(100).charge(-3000).linkStrength(function(x) {
     return x.weight * 1
 });
 
 force.start();
 
-var force2 = d3.layout.force().nodes(bg.labelAnchors).links(bg.labelAnchorLinks).gravity(0).linkDistance(25).linkStrength(8).charge(-100).size([graphContainerW, graphContainerH]);
+var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(25).linkStrength(8).charge(-100).size([graphContainerW, graphContainerH]);
 force2.start();
 
 
 
-var link = graph.selectAll("line.link").data(bg.links).enter().append("svg:line").attr("class", "link").style("stroke", "#FFFFFF").style("stroke-width", 3);
+var link = graph.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#FFFFFF").style("stroke-width", 3);
 
 var node = graph.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
-node.append("svg:circle").attr("r", function(d, i){return bg.nodes[i].size;}).style("fill", function(d, i){return bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";}).style("stroke", "#FFFFFF").style("stroke-width", 3);
+node.append("svg:circle").attr("r", function(d, i){return nodes[i].diameter;}).style("fill", function(d, i){return "#EEEEEE"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/}).style("stroke", "#FFFFFF").style("stroke-width", 3);
 
-var anchorLink = graph.selectAll("line.anchorLink").data(bg.labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
 
 var anchorNode = graph.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
 anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
@@ -161,12 +163,12 @@ function getRelatedTranslateY (y) {
 }
 
 function updateCurrentNode () {
-    node.each(function(d, i) {
-        if (i == bg.current.nodeId) {
-            currentNodeX = d.x;
-            currentNodeY = d.y;
-        }
-    });
+    // node.each(function(d, i) {
+    //     if (i == bg.current.nodeId) {
+    //         currentNodeX = d.x;
+    //         currentNodeY = d.y;
+    //     }
+    // });
 }
 
 function updateNode () {
