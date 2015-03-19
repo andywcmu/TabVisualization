@@ -55,9 +55,17 @@ function createNode (node) {
 }
 
 function DFSContractGraph (chainThreshold) {
-    function contractChain (node, isRoot) {
+    function contractChain (node, depth) {
+        /* DEBUG PURPOSE */
+        if (depth > 100) {
+            console.log("DEBUG: infinite loop");
+            return [[], -1];
+        }
+
         if (node.children.length == 1) {
-            [contentNodes, endNodeId] = contractChain(node.children[0], false);
+            ret = contractChain(node.children[0], depth + 1);
+            contentNodes = ret[0];
+            endNodeId = ret[1];
             contentNodes.push(node);
             return [contentNodes, endNodeId];
         } else {
@@ -65,8 +73,10 @@ function DFSContractGraph (chainThreshold) {
             var nodeId = createNode(node);
 
             for (child in node.children) {
-                [contentNodes, endNodeId] = contractChain(child, false);
-                
+                ret = contractChain(child, depth + 1);
+                contentNodes = ret[0];
+                endNodeId = ret[1];
+
                 links.push({
                     source : nodeId,
                     target : endNodeId,

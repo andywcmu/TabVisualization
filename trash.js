@@ -1,3 +1,6 @@
+/* Codes that are no longer being used. Archive purpose only. */
+
+
 var node = {
     label : "node " + bg.counter
 };
@@ -76,3 +79,34 @@ node.on("click", function(d, i){
     //     }
     // });
 });
+
+
+
+
+
+
+chrome.omnibox.onInputEntered.addListener(function (info) {
+    chrome.tabs.update({
+        url: GOOGLE_SEARCH_STR + info
+    });
+});
+
+
+
+
+
+
+
+function urlHash (url) {
+    return url.match(/^[^\#]+/)[0];
+}
+
+function updateCurrentNodeID (tabId) {
+    tab = getTab(tabId);
+
+    if (tab != null) {
+        url = urlHash(tab.url);
+        console.log(url);
+        current.nodeId = (url in sites) ? sites[url].index : -1;
+    }
+}
