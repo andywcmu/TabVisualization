@@ -178,7 +178,8 @@ function drawLinks (scope) {
 }
 
 function drawNodes (scope) {
-    var n = scope.enter()
+    var n = scope
+        .enter()
         .append("svg:g")
         .attr("class", "node");
 
@@ -202,7 +203,7 @@ function drawNodes (scope) {
 }
 
 function drawAnchorNodes (scope) {
-    var an = anchorNode
+    var an = scope
         .enter()
         .append("svg:g")
         .attr("class", "anchorNode");
@@ -237,21 +238,6 @@ function updateMouseAction () {
     });
 }
 
-function drawInitialGraph() {
-    var link = graph.selectAll("line.link").data(links);
-    drawLinks(link);
-
-    var node = graph.selectAll("g.node").data(nodes);
-    drawNodes(node);
-
-    var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks);
-
-    var anchorNode = graph.selectAll("g.anchorNode").data(labelAnchors);
-    drawAnchorNodes(anchorNode);
-
-    updateMouseAction();
-}
-
 function updateGraph(expandId) {
     link = link.data(links);
     drawLinks(link);
@@ -269,7 +255,18 @@ function updateGraph(expandId) {
     force.start();
 }
 
-drawInitialGraph();
+var link = graph.selectAll("line.link").data(links);
+drawLinks(link);
+
+var node = graph.selectAll("g.node").data(nodes);
+drawNodes(node);
+
+var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks);
+
+var anchorNode = graph.selectAll("g.anchorNode").data(labelAnchors);
+drawAnchorNodes(anchorNode);
+
+updateMouseAction();
 
 
 
