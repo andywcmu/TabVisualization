@@ -167,11 +167,6 @@ chrome.webNavigation.onCommitted.addListener(function (detail) {
         
         var visitId = getNextVisitId();
 
-        /* ???????????????? */
-        // chrome.tabs.query({}, function(tabs) {
-        //     tabStatus = tabs;        
-        // });
-
         if (isInLinkType(detail.transitionType, LINK_CHILD_TYPE)) {
             var parentVisitId = getVisitId(currentTabId);
             console.log(parentVisitId, currentTabId);
@@ -180,8 +175,6 @@ chrome.webNavigation.onCommitted.addListener(function (detail) {
             createRoot(visitId, detail.url);
         }   
     
-        // console.log(detail);
-
         setVisitId(detail.tabId, visitId);        
     }
 

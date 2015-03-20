@@ -82,7 +82,7 @@ function expandNode (nodeId) {
         });
     }
 
-    restart(nodeId);
+    updateGraph(nodeId);
 }
 
 // function expandGraph (visitId, depth) {
@@ -124,9 +124,6 @@ buildContractedGraph();
 
 
 
-
-
-
 /***********************/
 /*** VISUALIZE GRAPH ***/
 /***********************/
@@ -147,7 +144,6 @@ var graphContainer = d3.select("#graph_container")
     .call(zoomListener);
 
 var graph = graphContainer.append("g");
-
 
 var force = d3.layout.force()
     .size([graphContainerW, graphContainerH])
@@ -173,8 +169,6 @@ var force2 = d3.layout
     .size([graphContainerW, graphContainerH]);
 
 force2.start();
-
-
 
 function drawLinks (scope) {
     scope.enter().insert("line", ".node")
@@ -243,125 +237,39 @@ function updateMouseAction () {
     });
 }
 
+function drawInitialGraph() {
+    var link = graph.selectAll("line.link").data(links);
+    drawLinks(link);
 
-// var link = graph.selectAll("line.link")
-//     .data(links)
-//     .enter()
-//     .append("svg:line")
-//     .attr("class", "link")
-//     .style("stroke", "#FFFFFF")
-//     .style("stroke-width", 3);
-var link = graph.selectAll("line.link").data(links);
-drawLinks(link);
+    var node = graph.selectAll("g.node").data(nodes);
+    drawNodes(node);
 
+    var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks);
 
-var node = graph.selectAll("g.node").data(nodes);
-drawNodes(node);
-    // .enter()
-    // .append("svg:g")
-    // .attr("class", "node");
+    var anchorNode = graph.selectAll("g.anchorNode").data(labelAnchors);
+    drawAnchorNodes(anchorNode);
 
-// node.append("svg:circle")
-//     .attr("r", function (d, i) {
-//         return nodes[i].diameter;
-//     })
-//     .style("fill", function (d, i) {
-//         return "#EEAAAA"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/
-//     })
-//     .style("stroke", "#FFFFFF")
-//     .style("stroke-width", 3);
+    updateMouseAction();
+}
 
-// node.append("text")
-//     .attr("dy", 5)
-//     .attr("text-anchor", "middle")
-//     .style("fill", "#FFFFFF")
-//     .text(function (d, i) {
-//         return nodes[i].size > 1 ? nodes[i].size.toString() : "";
-//     });
-
-var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks);
-
-var anchorNode = graph.selectAll("g.anchorNode").data(labelAnchors);
-drawAnchorNodes(anchorNode);
-//     .enter()
-//     .append("svg:g")
-//     .attr("class", "anchorNode");
-
-// anchorNode.append("svg:circle")
-//     .attr("r", 0)
-//     .style("fill", "#FFF");
-
-// anchorNode.append("svg:text")
-//     .text(function(d, i) {
-//         return i % 2 == 0 ? "" : d.node.label
-//     })
-//     .style("fill", "#555")
-//     .style("font-family", "Arial")
-//     .style("font-size", 12);
-
-updateMouseAction();
-
-
-
-function restart(expandId) {
-
+function updateGraph(expandId) {
     link = link.data(links);
     drawLinks(link);
-    // link.enter().insert("line", ".node")
-    //     .attr("class", "link")
-    //     .style("stroke", "#FFFFFF")
-    //     .style("stroke-width", 3);
 
     node = node.data(nodes);
     drawNodes(node);
-    // var n = node
-    //     .enter()
-    //     .append("svg:g")
-    //     .attr("class", "node");
-    
-    // n.append("svg:circle")
-    //     .attr("r", function (d, i) {
-    //         return nodes[i].diameter;
-    //     })
-    //     .style("fill", function (d, i) {
-    //         return "#EEAAAA"; bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";
-    //     })
-    //     .style("stroke", "#FFFFFF")
-    //     .style("stroke-width", 3);
-
-    // n.append("text")
-    //     .attr("dy", 5)
-    //     .attr("text-anchor", "middle")
-    //     .style("fill", "#FFFFFF")
-    //     .text(function (d, i) {
-    //         return nodes[i].size > 1 ? nodes[i].size.toString() : "";
-    //     });
 
     anchorLink = anchorLink.data(labelAnchorLinks);
 
     anchorNode = anchorNode.data(labelAnchors);
     drawAnchorNodes(anchorNode);
-    // var an = anchorNode
-    //     .enter()
-    //     .append("svg:g")
-    //     .attr("class", "anchorNode");
-
-    // an.append("svg:circle")
-    //     .attr("r", 0)
-    //     .style("fill", "#FFF");
-
-    // an.append("svg:text")
-    //     .text(function(d, i) {
-    //         return i % 2 == 0 ? "" : d.node.label
-    //     })
-    //     .style("fill", "#555")
-    //     .style("font-family", "Arial")
-    //     .style("font-size", 12);
 
     updateMouseAction();
 
     force.start();
 }
+
+drawInitialGraph();
 
 
 
@@ -434,7 +342,6 @@ force.on("tick", function() {
             this.childNodes[1].setAttribute("transform", "translate(" + shiftX + "," + shiftY + ")");
         }
     });
-
 
     anchorNode.call(updateNode);
 
