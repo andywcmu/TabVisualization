@@ -34,11 +34,13 @@ var DIA_CHILD_NODE = 16;
 
 var CHAIN_THRESHOLD = 1
 
-function createNode (bgNode, diameter) {
+function createNode (visitId, diameter) {
     var node = {
-        label : bgNode.label,
-        url : bgNode.url,
-        diameter : diameter
+        visitId : visitId,
+        label : bg.graph[visitId].label,
+        url : bg.graph[visitId].url,
+        diameter : diameter,
+        size : bg.graph[visitId].size
     }
 
     nodes.push(node);
@@ -64,39 +66,64 @@ function createNode (bgNode, diameter) {
     return nodeId;
 }
 
-function expandGraph (visitId, depth) {
-    /* DEBUG PURPOSE */
-    if (depth > 1000) {
-        console.log("DEBUG: infinite loop");
-        return [[], -1];
-    }
-
-    var bgNode = bg.graph[visitId];
-    var fgNodeId = createNode(bgNode, depth == 0 ? DIA_ROOT_NODE : DIA_CHILD_NODE);
+function expandNode (nodeId) {
+    var node = nodes[nodeId];
+    node.size = 1;
     
+    bgNode = bg.graph[node.visitId];
     for (var i = 0; i < bgNode.children.length; i++) {
-        var retval = expandGraph(bgNode.children[i], depth + 1);
-        var contentNodes = retval[0];
-        var endNodeId = retval[1];
+        var childNodeId = createNode(bgNode.children[i], DIA_CHILD_NODE);
 
         links.push({
-            source : fgNodeId,
-            target : endNodeId,
-            content : contentNodes,
+            source : nodeId,
+            target : childNodeId,
+            // content : contentNodes,
             weight : 1
         });
     }
 
-    return [[], fgNodeId];
+    restart(nodeId);
 }
+
+// function expandGraph (visitId, depth) {
+//     /* DEBUG PURPOSE */
+//     if (depth > 1000) {
+//         console.log("DEBUG: infinite loop");
+//         return [[], -1];
+//     }
+
+//     var bgNode = bg.graph[visitId];
+//     var fgNodeId = createNode(bgNode, depth == 0 ? DIA_ROOT_NODE : DIA_CHILD_NODE);
+    
+//     for (var i = 0; i < bgNode.children.length; i++) {
+//         var retval = expandGraph(bgNode.children[i], depth + 1);
+//         var contentNodes = retval[0];
+//         var endNodeId = retval[1];
+
+//         links.push({
+//             source : fgNodeId,
+//             target : endNodeId,
+//             content : contentNodes,
+//             weight : 1
+//         });
+//     }
+
+//     return [[], fgNodeId];
+// }
+
+// function recursiveExpand ()
 
 function buildContractedGraph (chainThreshold) {
     for (rootId in bg.roots) {
-        expandGraph(rootId, 0);
+        // expandGraph(rootId, 0);
+        createNode(rootId, DIA_ROOT_NODE);
     }
 }
 
 buildContractedGraph();
+
+
+
 
 
 
@@ -106,43 +133,234 @@ buildContractedGraph();
 
 var graphContainerW = 800, graphContainerH = 600;
 
-var zoomListener = d3.behavior.zoom().scaleExtent([0.1, 3]).on("zoom", function () {
-    graph.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-});
+var zoomListener = d3.behavior
+    .zoom()
+    .scaleExtent([0.1, 3])
+    .on("zoom", function () {
+        graph.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+    });
 
-var graphContainer = d3.select("#graph_container").append("svg:svg").attr("width", graphContainerW).attr("height", graphContainerH).call(zoomListener);;
+var graphContainer = d3.select("#graph_container")
+    .append("svg:svg")
+    .attr("width", graphContainerW)
+    .attr("height", graphContainerH)
+    .call(zoomListener);
 
 var graph = graphContainer.append("g");
 
 
-
-var force = d3.layout.force().size([graphContainerW, graphContainerH]).nodes(nodes).links(links).gravity(0.2).linkDistance(100).charge(-3000).linkStrength(function(x) {
-    return x.weight * 1
-});
+var force = d3.layout.force()
+    .size([graphContainerW, graphContainerH])
+    .nodes(nodes)
+    .links(links)
+    .gravity(0.2)
+    .linkDistance(100)
+    .charge(-3000)
+    .linkStrength(function (x) {
+        return x.weight * 1
+    });
 
 force.start();
 
-var force2 = d3.layout.force().nodes(labelAnchors).links(labelAnchorLinks).gravity(0).linkDistance(25).linkStrength(8).charge(-100).size([graphContainerW, graphContainerH]);
+var force2 = d3.layout
+    .force()
+    .nodes(labelAnchors)
+    .links(labelAnchorLinks)
+    .gravity(0)
+    .linkDistance(25)
+    .linkStrength(8)
+    .charge(-100)
+    .size([graphContainerW, graphContainerH]);
+
 force2.start();
 
 
 
-var link = graph.selectAll("line.link").data(links).enter().append("svg:line").attr("class", "link").style("stroke", "#FFFFFF").style("stroke-width", 3);
+function drawLinks (scope) {
+    scope.enter().insert("line", ".node")
+        .attr("class", "link")
+        .style("stroke", "#FFFFFF")
+        .style("stroke-width", 3);
+}
 
-var node = graph.selectAll("g.node").data(force.nodes()).enter().append("svg:g").attr("class", "node");
-node.append("svg:circle").attr("r", function(d, i){return nodes[i].diameter;}).style("fill", function(d, i){return "#EEEEEE"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/}).style("stroke", "#FFFFFF").style("stroke-width", 3);
+function drawNodes (scope) {
+    var n = scope.enter()
+        .append("svg:g")
+        .attr("class", "node");
 
-var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks)//.enter().append("svg:line").attr("class", "anchorLink").style("stroke", "#999");
+    n.append("svg:circle")
+        .attr("r", function (d, i) {
+            return nodes[i].diameter;
+        })
+        .style("fill", function (d, i) {
+            return "#EEAAAA"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/
+        })
+        .style("stroke", "#FFFFFF")
+        .style("stroke-width", 3);
 
-var anchorNode = graph.selectAll("g.anchorNode").data(force2.nodes()).enter().append("svg:g").attr("class", "anchorNode");
-anchorNode.append("svg:circle").attr("r", 0).style("fill", "#FFF");
-anchorNode.append("svg:text").text(function(d, i) {
-    return i % 2 == 0 ? "" : d.node.label
-}).style("fill", "#555").style("font-family", "Arial").style("font-size", 12);
+    n.append("text")
+        .attr("dy", 5)
+        .attr("text-anchor", "middle")
+        .style("fill", "#FFFFFF")
+        .text(function (d, i) {
+            return nodes[i].size > 1 ? nodes[i].size.toString() : "";
+        });
+}
+
+function drawAnchorNodes (scope) {
+    var an = anchorNode
+        .enter()
+        .append("svg:g")
+        .attr("class", "anchorNode");
+
+    an.append("svg:circle")
+        .attr("r", 0)
+        .style("fill", "#FFF");
+
+    an.append("svg:text")
+        .text(function(d, i) {
+            return i % 2 == 0 ? "" : d.node.label
+        })
+        .style("fill", "#555")
+        .style("font-family", "Arial")
+        .style("font-size", 12);
+}
+
+function updateMouseAction () {
+    node.on("click", function (d, i) {
+        if (nodes[i].size <= 1) {
+            chrome.tabs.create({
+                url: nodes[i].url
+            });
+        } else {
+            currentNodeId = i;
+            updateCurrentNode();
+            d3.select(this)
+                .select('text')
+                .text("");
+            expandNode(i);
+        }
+    });
+}
 
 
-function urlHash (url) {
-    return url.match(/^[^\#]+/)[0];
+// var link = graph.selectAll("line.link")
+//     .data(links)
+//     .enter()
+//     .append("svg:line")
+//     .attr("class", "link")
+//     .style("stroke", "#FFFFFF")
+//     .style("stroke-width", 3);
+var link = graph.selectAll("line.link").data(links);
+drawLinks(link);
+
+
+var node = graph.selectAll("g.node").data(nodes);
+drawNodes(node);
+    // .enter()
+    // .append("svg:g")
+    // .attr("class", "node");
+
+// node.append("svg:circle")
+//     .attr("r", function (d, i) {
+//         return nodes[i].diameter;
+//     })
+//     .style("fill", function (d, i) {
+//         return "#EEAAAA"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/
+//     })
+//     .style("stroke", "#FFFFFF")
+//     .style("stroke-width", 3);
+
+// node.append("text")
+//     .attr("dy", 5)
+//     .attr("text-anchor", "middle")
+//     .style("fill", "#FFFFFF")
+//     .text(function (d, i) {
+//         return nodes[i].size > 1 ? nodes[i].size.toString() : "";
+//     });
+
+var anchorLink = graph.selectAll("line.anchorLink").data(labelAnchorLinks);
+
+var anchorNode = graph.selectAll("g.anchorNode").data(labelAnchors);
+drawAnchorNodes(anchorNode);
+//     .enter()
+//     .append("svg:g")
+//     .attr("class", "anchorNode");
+
+// anchorNode.append("svg:circle")
+//     .attr("r", 0)
+//     .style("fill", "#FFF");
+
+// anchorNode.append("svg:text")
+//     .text(function(d, i) {
+//         return i % 2 == 0 ? "" : d.node.label
+//     })
+//     .style("fill", "#555")
+//     .style("font-family", "Arial")
+//     .style("font-size", 12);
+
+updateMouseAction();
+
+
+
+function restart(expandId) {
+
+    link = link.data(links);
+    drawLinks(link);
+    // link.enter().insert("line", ".node")
+    //     .attr("class", "link")
+    //     .style("stroke", "#FFFFFF")
+    //     .style("stroke-width", 3);
+
+    node = node.data(nodes);
+    drawNodes(node);
+    // var n = node
+    //     .enter()
+    //     .append("svg:g")
+    //     .attr("class", "node");
+    
+    // n.append("svg:circle")
+    //     .attr("r", function (d, i) {
+    //         return nodes[i].diameter;
+    //     })
+    //     .style("fill", function (d, i) {
+    //         return "#EEAAAA"; bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";
+    //     })
+    //     .style("stroke", "#FFFFFF")
+    //     .style("stroke-width", 3);
+
+    // n.append("text")
+    //     .attr("dy", 5)
+    //     .attr("text-anchor", "middle")
+    //     .style("fill", "#FFFFFF")
+    //     .text(function (d, i) {
+    //         return nodes[i].size > 1 ? nodes[i].size.toString() : "";
+    //     });
+
+    anchorLink = anchorLink.data(labelAnchorLinks);
+
+    anchorNode = anchorNode.data(labelAnchors);
+    drawAnchorNodes(anchorNode);
+    // var an = anchorNode
+    //     .enter()
+    //     .append("svg:g")
+    //     .attr("class", "anchorNode");
+
+    // an.append("svg:circle")
+    //     .attr("r", 0)
+    //     .style("fill", "#FFF");
+
+    // an.append("svg:text")
+    //     .text(function(d, i) {
+    //         return i % 2 == 0 ? "" : d.node.label
+    //     })
+    //     .style("fill", "#555")
+    //     .style("font-family", "Arial")
+    //     .style("font-size", 12);
+
+    updateMouseAction();
+
+    force.start();
 }
 
 
@@ -151,6 +369,7 @@ function urlHash (url) {
 /*** NODE & LINK POSITION RELATED STUFF ***/
 /******************************************/
 
+var currentNodeId = -1;
 var currentNodeX = graphContainerW / 2;
 var currentNodeY = graphContainerH / 2;
 
@@ -163,12 +382,12 @@ function getRelatedTranslateY (y) {
 }
 
 function updateCurrentNode () {
-    // node.each(function(d, i) {
-    //     if (i == bg.current.nodeId) {
-    //         currentNodeX = d.x;
-    //         currentNodeY = d.y;
-    //     }
-    // });
+    node.each(function(d, i) {
+        if (i == currentNodeId) {
+            currentNodeX = d.x;
+            currentNodeY = d.y;
+        }
+    });
 }
 
 function updateNode () {
@@ -190,6 +409,8 @@ function updateLink () {
 }
 
 force.on("tick", function() {
+
+    updateCurrentNode();
 
     force2.start();
 
@@ -221,10 +442,4 @@ force.on("tick", function() {
     anchorLink.call(updateLink);
 });
 
-
-
-
-
-
-updateCurrentNode();
 

@@ -92,8 +92,37 @@ function centerNode(n) {
     zoomListener.translate([x, y]);
 }
 
-node.on("click", function(d, i){
-    chrome.tabs.create({url: bg.nodes[i].url});
+var anchorLink = graph.selectAll("line.anchorLink")
+    .data(labelAnchorLinks);
+    // .enter()
+    // .append("svg:line")
+    // .attr("class", "anchorLink")
+    // .style("stroke", "#999");
+
+
+
+
+GOOGLE_SEARCH_STR = "http://www.google.com/search?q=";
+
+
+chrome.omnibox.onInputEntered.addListener(function (info) {
+    chrome.tabs.update({
+        url: GOOGLE_SEARCH_STR + info
+    });
+});
+
+
+
+
+node.on("click", function (d, i) {
+    if (nodes[i].size <= 1) {
+        chrome.tabs.create({
+            url: bg.graph[i].url
+        });
+    } else {
+        expandNode(i);
+    }
+    
     // centerNode(d);
     /* Should check if the url already exists in one of the tabs first
      * if yes, switch to that tab. otherwise open a new tab with that url.
@@ -111,23 +140,6 @@ node.on("click", function(d, i){
     //     }
     // });
 });
-
-
-
-
-GOOGLE_SEARCH_STR = "http://www.google.com/search?q=";
-
-
-chrome.omnibox.onInputEntered.addListener(function (info) {
-    chrome.tabs.update({
-        url: GOOGLE_SEARCH_STR + info
-    });
-});
-
-
-
-
-
 
 
 function urlHash (url) {

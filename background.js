@@ -47,7 +47,9 @@ var roots = [];
             label : the node's label,
             url : the node's url,
             size : node's diameter in visualization,
-            children : [children id's]
+            parent : parent's id (-1 if not exist),
+            children : [children id's],
+            size : size of the subtree from this node
         }
     }
 */
@@ -96,12 +98,24 @@ chrome.windows.onFocusChanged.addListener(function (id) {
 /*** GRAPH BUILDER FUNCTIONS ***/
 /*******************************/
 
-function createNode (visitId, url) {
+function createNode (visitId, parentId, url) {
     graph[visitId] = {
         label : url,
         url : url,
-        children : []
+        parent : parentId,
+        children : [],
+        size : 1
     }
+
+    /* Recursively update the size of the ancestors */
+    function updateAncestorSize (visitId) {
+        if (visitId >= 0) {
+            graph[visitId].size++;
+            updateAncestorSize(graph[visitId].parentId);
+        }
+    }
+
+    updateAncestorSize(parentId);
 }
 
 function createLink (parentId, childId) {
@@ -109,12 +123,12 @@ function createLink (parentId, childId) {
 }
 
 function createChildren (parentId, childId, childUrl) {
-    createNode(childId, childUrl);
+    createNode(childId, parentId, childUrl);
     createLink(parentId, childId);
 }
 
 function createRoot (rootId, rootUrl) { 
-    createNode(rootId, rootUrl);
+    createNode(rootId, -1, rootUrl);
     roots.push(rootId);
 }
 
@@ -159,13 +173,14 @@ chrome.webNavigation.onCommitted.addListener(function (detail) {
         // });
 
         if (isInLinkType(detail.transitionType, LINK_CHILD_TYPE)) {
-            parentVisitId = getVisitId(currentTabId);
+            var parentVisitId = getVisitId(currentTabId);
+            console.log(parentVisitId, currentTabId);
             createChildren(parentVisitId, visitId, detail.url);
         } else {
             createRoot(visitId, detail.url);
         }   
     
-        console.log(detail);
+        // console.log(detail);
 
         setVisitId(detail.tabId, visitId);        
     }
