@@ -1,5 +1,4 @@
 /* TODO:
- * URGENT - Unable to track Shift + Ctrl + Click :(
  * Change graph to a list
  * Write README
  */
@@ -62,8 +61,10 @@ var graph = {};
 /*******************/
 
 var currentTabId = -1;
+var previousTabId = -1;
 
-function updateCurrentTabId (tabId) {
+function updateTabIdStatus (tabId) {
+    previousTabId = currentTabId;
     currentTabId = tabId;
 }
 
@@ -72,7 +73,7 @@ function updateCurrentTabId (tabId) {
  */
 
 chrome.tabs.onActivated.addListener(function (info) {
-    updateCurrentTabId(info.tabId);
+    updateTabIdStatus(info.tabId);
 });
 
 chrome.windows.onFocusChanged.addListener(function (id) {
@@ -86,7 +87,7 @@ chrome.windows.onFocusChanged.addListener(function (id) {
             /** the current focused window is a Chrome window **/
 
             tabId = tabs[0].id;
-            updateCurrentTabId(tabId);
+            updateTabIdStatus(tabId);
         }
     });
 
@@ -110,8 +111,8 @@ function createNode (visitId, parentId, url) {
     /* Recursively update the size of the ancestors */
     function updateAncestorSize (visitId) {
         if (visitId >= 0) {
-            graph[visitId].size++;
-            updateAncestorSize(graph[visitId].parentId);
+            graph[visitId].size += 1;
+            updateAncestorSize(graph[visitId].parent);
         }
     }
 
@@ -139,13 +140,20 @@ function createRoot (rootId, rootUrl) {
 /****************************************/
 
 /* If a visit is caused by the following transition type, ignore the visit. */
-LINK_IGNORE_TYPE = ["auto_subframe"];
+var LINK_IGNORE_TYPE = ["auto_subframe"];
 
 /* If a visit is caused by the following transition type, this visit node
  * should branch out from its parent node (it's a child node). Otherwise, it
  * should be a new root node.
  */
-LINK_CHILD_TYPE = ["link", "form_submit"];
+var LINK_CHILD_TYPE = ["link", "form_submit"];
+
+var IGNORE_URL = "https://www.google.com/_/chrome/newtab";
+
+/* If user clicks a node in the visualization, the foreground will set
+ * this to the visitId of the node being clicked.
+ */
+var commitedVisitIdFromForegroundClick = -1;
 
 /* Javascript has a weird "is in" implementation when checking if a string
  * is in a list of enum. I wrote this function to avoid the confusion.
@@ -160,19 +168,44 @@ function isInLinkType (trans, typeList) {
     return false;
 }
 
-chrome.webNavigation.onCommitted.addListener(function (detail) {
 
-    if (!(isInLinkType(detail.transitionType, LINK_IGNORE_TYPE))) {
+
+chrome.webNavigation.onCommitted.addListener(function (detail) {
+    /* If the navigation is committed by user clicking a node in the
+     * foreground visualization
+     */
+    if (commitedVisitIdFromForegroundClick >= 0) {
+        setVisitId(detail.tabId, commitedVisitIdFromForegroundClick);
+        commitedVisitIdFromForegroundClick = -1;
+
+    } else if (!(isInLinkType(detail.transitionType, LINK_IGNORE_TYPE))) {
         /** This is a valid visit. Prepare to add a new node **/
-        
-        var visitId = getNextVisitId();
 
         if (isInLinkType(detail.transitionType, LINK_CHILD_TYPE)) {
-            var parentVisitId = getVisitId(currentTabId);
-            console.log(parentVisitId, currentTabId);
+            
+            if (currentTabId in visitIds) {
+                var parentVisitId = getVisitId(currentTabId);
+            
+            /* HACK: I can't think of a good way to keep track of previous
+             * tab when user open a link with Ctrl + Shift + Click.
+             * I just hack it this way to recognize the case.
+             */
+            } else {
+                var parentVisitId = getVisitId(previousTabId);
+            }
+
+            var visitId = getNextVisitId();
             createChildren(parentVisitId, visitId, detail.url);
         } else {
-            createRoot(visitId, detail.url);
+
+            /* If the new page commited should be ignored (like new tab page) */
+            if (detail.url.slice(0, IGNORE_URL.length) == IGNORE_URL) {
+                var visitId = -1;
+                
+            } else {
+                var visitId = getNextVisitId();
+                createRoot(visitId, detail.url);
+            }
         }   
     
         setVisitId(detail.tabId, visitId);        
@@ -187,7 +220,9 @@ chrome.webNavigation.onCommitted.addListener(function (detail) {
 /*************************/
 
 function updateLabel (visitId, title) {
-    graph[visitId].label = title;
+    if (visitId in graph) {
+        graph[visitId].label = title;
+    }
 }
 
 /* When a node is created (onCommited), its label initially will be its url.

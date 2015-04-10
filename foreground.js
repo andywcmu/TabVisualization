@@ -1,3 +1,8 @@
+var WHITE = "#FFFFFF"
+var GREEN1 = "#C9FFF0"
+var GREEN2 = "#A6FFE6"
+var GREEN3 = "#12FFBC"
+
 /* get information from background.js */
 var bg = chrome.extension.getBackgroundPage();
 
@@ -20,6 +25,10 @@ var labelAnchors = [];
 var labelAnchorLinks = [];
 var links = [];
 
+var visitIdToNodeId = {};
+
+var currentVisitId = bg.visitIds[bg.currentTabId];
+
 /* DFS using recursion. This assumes that the graph from background has
  * no cycle or we're fucked (and yes we constructed the background graph to
  * have no cycle. see background.js).
@@ -40,12 +49,14 @@ function createNode (visitId, diameter) {
         label : bg.graph[visitId].label,
         url : bg.graph[visitId].url,
         diameter : diameter,
-        size : bg.graph[visitId].size
+        size : bg.graph[visitId].size,
+        distanceToCurrent : -1
     }
 
     nodes.push(node);
 
     var nodeId = nodes.length - 1;
+    visitIdToNodeId[visitId] = nodeId;
 
     /** Add label **/
 
@@ -66,7 +77,7 @@ function createNode (visitId, diameter) {
     return nodeId;
 }
 
-function expandNode (nodeId) {
+function expandNode (nodeId, isInitExpand, childVisitIdOnPathToTargetNode) {
     var node = nodes[nodeId];
     node.size = 1;
     
@@ -78,11 +89,15 @@ function expandNode (nodeId) {
             source : nodeId,
             target : childNodeId,
             // content : contentNodes,
-            weight : 1
+            weight : 1,
+            isPathToCurrent : nodes[childNodeId].visitId == childVisitIdOnPathToTargetNode
         });
+
     }
 
-    updateGraph(nodeId);
+    if (!isInitExpand) {
+        updateGraph(nodeId);
+    }
 }
 
 // function expandGraph (visitId, depth) {
@@ -111,17 +126,29 @@ function expandNode (nodeId) {
 //     return [[], fgNodeId];
 // }
 
-// function recursiveExpand ()
+function expandPathFromCurrentToRoot (visitId, childVisitId, depth) {
+    var parentVisitId = bg.graph[visitId].parent;
 
-function buildContractedGraph (chainThreshold) {
-    for (rootId in bg.roots) {
-        // expandGraph(rootId, 0);
-        createNode(rootId, DIA_ROOT_NODE);
+    if (parentVisitId >= 0) {
+        expandPathFromCurrentToRoot(parentVisitId, visitId, depth + 1);
+    }
+
+    var nodeId = visitIdToNodeId[visitId];
+    nodes[nodeId].distanceToCurrent = depth;
+    expandNode(nodeId, true, childVisitId);
+}
+
+function buildGraph (chainThreshold) {
+    for (var i = 0; i < bg.roots.length; i++) {
+        createNode(bg.roots[i], DIA_ROOT_NODE);
+    }
+
+    if (currentVisitId >= 0) {
+        expandPathFromCurrentToRoot(currentVisitId, -1, 0);
     }
 }
 
-buildContractedGraph();
-
+buildGraph();
 
 
 /***********************/
@@ -150,7 +177,7 @@ var force = d3.layout.force()
     .nodes(nodes)
     .links(links)
     .gravity(0.2)
-    .linkDistance(100)
+    .linkDistance(50)
     .charge(-3000)
     .linkStrength(function (x) {
         return x.weight * 1
@@ -173,7 +200,9 @@ force2.start();
 function drawLinks (scope) {
     scope.enter().insert("line", ".node")
         .attr("class", "link")
-        .style("stroke", "#FFFFFF")
+        .style("stroke", function (d, i) {
+            return links[i].isPathToCurrent ? GREEN3 : WHITE;
+        })
         .style("stroke-width", 3);
 }
 
@@ -187,11 +216,19 @@ function drawNodes (scope) {
         .attr("r", function (d, i) {
             return nodes[i].diameter;
         })
-        .style("fill", function (d, i) {
-            return "#EEAAAA"; /*bg.current.nodeId == i ? "#A3D900" : "#EEEEEE";*/
+        .style("fill", GREEN1)
+        .style("-webkit-animation", function (d, i) {
+            if (nodes[i].distanceToCurrent >= 0) {
+                return "currentNodeAnimation" + (nodes[i].distanceToCurrent % 5) + " 0.8s infinite";
+            } else {
+                return "initial";
+            }
         })
-        .style("stroke", "#FFFFFF")
+        .style("stroke", function (d, i) {
+            return nodes[i].distanceToCurrent >= 0 ? GREEN3 : WHITE;
+        })
         .style("stroke-width", 3);
+        
 
     n.append("text")
         .attr("dy", 5)
@@ -216,7 +253,7 @@ function drawAnchorNodes (scope) {
         .text(function(d, i) {
             return i % 2 == 0 ? "" : d.node.label
         })
-        .style("fill", "#555")
+        .style("fill", "#888888")
         .style("font-family", "Arial")
         .style("font-size", 12);
 }
@@ -224,16 +261,21 @@ function drawAnchorNodes (scope) {
 function updateMouseAction () {
     node.on("click", function (d, i) {
         if (nodes[i].size <= 1) {
+            bg.commitedVisitIdFromForegroundClick = nodes[i].visitId;
+
             chrome.tabs.create({
                 url: nodes[i].url
             });
         } else {
-            currentNodeId = i;
-            updateCurrentNode();
+            // updateCurrentNodeTarget(i);
+            
             d3.select(this)
                 .select('text')
                 .text("");
-            expandNode(i);
+            
+            expandNode(i, false, -1);
+
+            // currentNodeId = i;
         }
     });
 }
@@ -269,21 +311,23 @@ drawAnchorNodes(anchorNode);
 updateMouseAction();
 
 
-
 /******************************************/
 /*** NODE & LINK POSITION RELATED STUFF ***/
 /******************************************/
 
-var currentNodeId = -1;
+var currentNodeId = visitIdToNodeId[currentVisitId];
 var currentNodeX = graphContainerW / 2;
 var currentNodeY = graphContainerH / 2;
 
+var currentNodeTargetX = graphContainerW / 2;
+var currentNodeTargetY = graphContainerH / 2;
+
 function getRelatedTranslateX (x) {
-    return x - currentNodeX + (graphContainerW / 2);
+    return x - currentNodeX + currentNodeTargetX;
 }
 
 function getRelatedTranslateY (y) {
-    return y - currentNodeY + (graphContainerH / 2);
+    return y - currentNodeY + currentNodeTargetY;
 }
 
 function updateCurrentNode () {
@@ -292,8 +336,26 @@ function updateCurrentNode () {
             currentNodeX = d.x;
             currentNodeY = d.y;
         }
+        if (i == 6) {
+            console.log(d);
+        }
+        
     });
 }
+
+// function updateCurrentNodeTarget (nodeId) {
+//     node.each(function(d, i) {
+//         if (i == nodeId) {
+            
+//             var scale = zoomListener.scale();
+//             var translate = zoomListener.translate();
+//             console.log(translate);
+//             // currentNodeTargetX = 10 - translate[0];
+//             // currentNodeTargetY = 10 - translate[1];
+//             // zoomListener.translate([d.x, y]);
+//         }
+//     });
+// }
 
 function updateNode () {
     this.attr("transform", function(d, i) {
@@ -345,5 +407,4 @@ force.on("tick", function() {
     link.call(updateLink);
     anchorLink.call(updateLink);
 });
-
 
